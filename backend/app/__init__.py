@@ -16,9 +16,6 @@ from .utils import api_response
 
 
 def create_app() -> Flask:
-    """
-    Application factory.
-    """
     app = Flask(__name__)
     app.config.from_object(Config)
 
