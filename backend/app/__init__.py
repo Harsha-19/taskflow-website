@@ -25,6 +25,16 @@ def create_app() -> Flask:
         resources={r"/*": {"origins": Config.CORS_ORIGINS}},
         supports_credentials=True,
     )
+    
+    @app.route("/")
+    def home():
+        return {
+            "status": "ok",
+            "routes": [
+                "/api/tasks",
+                "/api/auth",
+            ]
+        }
 
     # Initialize extensions
     db.init_app(app)
