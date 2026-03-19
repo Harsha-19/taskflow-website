@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import { getStats } from "../services/api.js";
+import { getStats } from "frontend/src/services/api.js";
 
 const StatsContext = createContext(null);
 
