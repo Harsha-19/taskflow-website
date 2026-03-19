@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global reset */
+* {
+  box-sizing: border-box;
+}
+
+/* Base body style */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  background: #ffffff;
+  color: #111827;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+html.dark body {
+  background: #030712;
+  color: #f3f4f6;
+}
+
+/* Root container fix */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
