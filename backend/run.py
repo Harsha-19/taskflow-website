@@ -1,16 +1,15 @@
 from __future__ import annotations
-
-from dotenv import load_dotenv
-
-
-from app import create_app
 import os
+from dotenv import load_dotenv
+from app import create_app
 
-def main() -> None:
-    load_dotenv()
-    app = create_app()
-    port=int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port) #debug=True
+# Load environment variables first
+load_dotenv()
+
+# This global 'app' variable is what Gunicorn (and Render) is looking for
+app = create_app()
 
 if __name__ == "__main__":
-    main()
+    # In local development, start the dev server
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
