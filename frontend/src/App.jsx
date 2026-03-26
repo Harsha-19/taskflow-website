@@ -1,12 +1,12 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
 
-import Dashboard from "./pages/Dashboard";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Pricing from "./pages/Pricing";
-import Register from "./pages/Register";
-import ProtectedRoute from "./routes/ProtectedRoute";
+import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
+import Login from "@/pages/Login";
+import Pricing from "@/pages/Pricing";
+import Register from "@/pages/Register";
+import ProtectedRoute from "@/routes/ProtectedRoute";
 
 function App() {
   return (

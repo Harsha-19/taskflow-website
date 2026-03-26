@@ -1,194 +1,95 @@
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://taskflow-website-4i4m.onrender.com";
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
-const TOKEN_KEY = "taskflow_token";
-const LEGACY_TOKEN_KEY = "token";
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+const TOKEN_KEY = 'taskflow_token';
 
-// ================= TOKEN HANDLING =================
+const apiClient = axios.create({
+  baseURL: BASE_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY);
-}
+// Request Interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(LEGACY_TOKEN_KEY, token);
-}
-
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(LEGACY_TOKEN_KEY);
-}
-
-export function logout() {
-  clearToken();
-  window.location.href = "/login";
-}
-
-// ================= CORE REQUEST =================
-
-async function request(path, { method = "GET", body, auth = false } = {}) {
-  const headers = { Accept: "application/json" };
-
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
-
-  const url = `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  const contentType = res.headers.get("content-type") || "";
-  const data = contentType.includes("application/json") ? await res.json() : null;
-
-  if (!res.ok) {
-    if (res.status === 401 && auth) {
-      clearToken();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+// Response Interceptor
+apiClient.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    const message = error.response?.data?.message || 'Something went wrong';
+    
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
 
-    const message =
-      (data && (data.error || data.message)) || `Request failed (${res.status})`;
+    if (error.response?.status === 429) {
+      toast.error('Too many requests. Please try again later.');
+    } else if (error.response?.status >= 500) {
+      toast.error('Server error. Our team is notified.');
+    }
 
-    const err = new Error(message);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+    return Promise.reject({
+      message,
+      status: error.response?.status,
+      data: error.response?.data?.data,
+    });
   }
+);
 
-  return data;
-}
+/**
+ * API Service Layer
+ */
+const api = {
+  // Auth
+  auth: {
+    login: (credentials) => apiClient.post('/auth/login', credentials),
+    register: (userData) => apiClient.post('/auth/register', userData),
+    me: () => apiClient.get('/auth/me'),
+  },
 
-// ================= AUTH =================
+  // Projects
+  projects: {
+    list: () => apiClient.get('/projects/'),
+    create: (data) => apiClient.post('/projects/', data),
+    update: (id, data) => apiClient.put(`/projects/${id}`, data),
+    delete: (id) => apiClient.delete(`/projects/${id}`),
+  },
 
-export async function login({ usernameOrEmail, password }) {
-  const response = await request("/api/auth/login", {
-    method: "POST",
-    body: { username_or_email: usernameOrEmail, password },
-  });
+  // Tasks
+  tasks: {
+    list: (projectId) => apiClient.get(`/tasks/project/${projectId}`),
+    create: (data) => apiClient.post('/tasks/', data),
+    update: (id, data) => apiClient.put(`/tasks/${id}`, data),
+    delete: (id) => apiClient.delete(`/tasks/${id}`),
+  },
 
-  const data = response?.data ?? response;
-  if (data?.access_token) setToken(data.access_token);
+  // Stats & Dashboard
+  dashboard: {
+    getOverview: () => apiClient.get('/dashboard/'),
+    getStats: () => apiClient.get('/stats/'),
+  },
 
-  return data;
-}
+  // Plans & Subscriptions
+  subscriptions: {
+    listPlans: () => apiClient.get('/plans/'),
+    getCurrent: () => apiClient.get('/subscriptions/me'),
+    subscribe: (planId) => apiClient.post('/subscriptions/', { plan_id: planId }),
+  },
+};
 
-export async function register({ username, email, password }) {
-  const response = await request("/api/auth/register", {
-    method: "POST",
-    body: { username, email, password },
-  });
-
-  return response?.data ?? response;
-}
-
-export async function getCurrentUser() {
-  const response = await request("/api/auth/me", { auth: true });
-  return response?.data ?? response;
-}
-
-// ================= STATS =================
-
-export async function getStats() {
-  const response = await request("/api/stats", { auth: true });
-  return response?.data ?? response;
-}
-
-// ================= PROJECTS =================
-
-export async function getProjects() {
-  const response = await request("/api/projects", { auth: true });
-  return response?.data ?? response;
-}
-
-export async function createProject(name) {
-  const response = await request("/api/projects", {
-    method: "POST",
-    body: { name },
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-export async function updateProject(id, updates) {
-  const response = await request(`/api/projects/${id}`, {
-    method: "PUT",
-    body: updates,
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-export async function deleteProject(id) {
-  const response = await request(`/api/projects/${id}`, {
-    method: "DELETE",
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-// ================= TASKS =================
-
-export async function getTasks(projectId) {
-  const response = await request(`/api/tasks/${projectId}`, { auth: true });
-  return response?.data ?? response;
-}
-
-export async function createTask({ title, project_id, due_date, priority, notes }) {
-  const response = await request("/api/tasks", {
-    method: "POST",
-    body: { title, project_id, due_date, priority, notes },
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-export async function updateTask(taskId, updates) {
-  const response = await request(`/api/tasks/${taskId}`, {
-    method: "PUT",
-    body: updates,
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-export async function toggleTask(taskId, completed) {
-  const response = await request(`/api/tasks/${taskId}`, {
-    method: "PUT",
-    body: { completed },
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-export async function deleteTask(taskId) {
-  const response = await request(`/api/tasks/${taskId}`, {
-    method: "DELETE",
-    auth: true,
-  });
-  return response?.data ?? response;
-}
-
-// ================= SUBSCRIPTION =================
-
-export async function subscribeToPlan(planId) {
-  return await request("/api/subscription", {
-    method: "POST",
-    body: { plan_id: planId },
-    auth: true,
-  });
-}
-
-export async function getMySubscription() {
-  return await request("/api/subscription/me", { auth: true });
-}
+export default api;

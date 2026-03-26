@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import { getMySubscription, getToken, subscribeToPlan } from "../services/api";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import api from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
 
-const pricing = [
+const pricingPlans = [
   {
     id: 1,
     name: "Starter",
     price: "$9",
     desc: "Great for solo founders and small teams getting started.",
-    highlight: false,
+    features: ["Up to 3 Projects", "Basic Task Tracking", "Email Support"],
   },
   {
     id: 2,
     name: "Pro",
     price: "$29",
     desc: "Best for growing teams that need automation and visibility.",
+    features: ["Unlimited Projects", "Priority Support", "Advanced Analytics", "Custom Workflow"],
     highlight: true,
   },
   {
@@ -24,159 +27,122 @@ const pricing = [
     name: "Enterprise",
     price: "$99",
     desc: "For larger teams that need scale, control, and advanced workflows.",
-    highlight: false,
+    features: ["Dedicated Support", "SLA Guarantees", "Custom Integration", "Audit Logs"],
   },
 ];
 
 export default function Pricing() {
-  const [activePlan, setActivePlan] = useState(null);
-  const [loadingPlan, setLoadingPlan] = useState(null);
-  const [message, setMessage] = useState("");
+  const { isAuthenticated } = useAuth();
+  const [activePlanId, setActivePlanId] = useState(null);
+  const [loadingPlanId, setLoadingPlanId] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-
     async function loadSubscription() {
-      if (!getToken()) return;
-
+      if (!isAuthenticated) return;
       try {
-        const subscription = await getMySubscription();
-        console.log("plan:", subscription?.plan_id, typeof subscription?.plan_id);
-        if (!cancelled) {
-          setActivePlan(subscription?.plan_id != null ? Number(subscription.plan_id) : null);
-        }
+        const res = await api.subscriptions.getCurrent();
+        setActivePlanId(res.data.subscription?.plan_id != null ? Number(res.data.subscription.plan_id) : null);
       } catch (error) {
-        if (error?.status !== 401) {
-          console.error("Failed to fetch subscription", error);
-        }
+        console.error("Failed to fetch subscription", error);
       }
     }
-
     loadSubscription();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [isAuthenticated]);
 
   async function handleChoosePlan(planId) {
-    if (activePlan === planId) return;
-
-    if (!getToken()) {
-      alert("Please login first");
+    if (!isAuthenticated) {
+      toast.error("Please log in to choose a plan");
       return;
     }
+    
+    if (activePlanId === planId) return;
 
-    const previousPlan = activePlan;
-    setActivePlan(planId);
-    setLoadingPlan(planId);
-    setMessage("");
-
+    setLoadingPlanId(planId);
     try {
-      const response = await subscribeToPlan(planId);
-      if (!response?.message) {
-        throw new Error("Subscription update failed");
-      }
-      setMessage("Plan updated successfully");
+      await api.subscriptions.subscribe(planId);
+      setActivePlanId(planId);
+      toast.success("Successfully upgraded your plan!");
     } catch (error) {
-      setActivePlan(previousPlan);
-      if (error?.status === 401) {
-        return;
-      }
-      console.error("Failed to subscribe to plan", error);
-      alert(error?.message || "Failed to subscribe");
+      toast.error(error.message || "Failed to upgrade");
     } finally {
-      setLoadingPlan(null);
+      setLoadingPlanId(null);
     }
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 flex flex-col">
       <Navbar />
 
-      <section className="py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
-              Pricing
+      <main className="flex-1 py-16 md:py-24 bg-gray-50 dark:bg-gray-950">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-base font-semibold leading-7 text-indigo-600 uppercase tracking-widest">Pricing</h2>
+            <p className="mt-2 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+              Scalable plans for teams of all sizes
             </p>
-            <h1 className="mt-3 text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100 md:text-5xl">
-              Choose a plan that fits
-            </h1>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Start small, upgrade as your team grows.
+            <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-400">
+              Transform your workflow with TaskFlow. Start for free and upgrade as you grow.
             </p>
-            {message && (
-              <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
-                {message}
-              </div>
-            )}
           </div>
 
-          <div className="mt-14 grid gap-8 md:grid-cols-3">
-            {pricing.map((plan) => {
-              const isActivePlan = activePlan === plan.id;
-              const isUpdatingThisPlan = loadingPlan === plan.id;
-
-              return (
+          <div className="mt-16 grid gap-8 md:grid-cols-3">
+            {pricingPlans.map((plan) => (
               <div
                 key={plan.name}
-                className={`rounded-3xl p-8 text-center transition ${
-                  isActivePlan
-                    ? "border-2 border-blue-600 bg-white shadow-xl scale-105 dark:bg-gray-900"
-                    : "border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                className={`relative flex flex-col rounded-3xl p-8 shadow-xl transition-all duration-300 transform hover:-translate-y-2 bg-white dark:bg-gray-900 ${
+                  plan.highlight ? 'ring-2 ring-indigo-600 ring-offset-2 dark:ring-offset-gray-950' : 'border border-gray-100 dark:border-gray-800'
                 }`}
-                style={
-                  isActivePlan
-                    ? {
-                        boxShadow: "0 0 0 2px rgb(37 99 235 / 0.35)",
-                      }
-                    : undefined
-                }
               >
                 {plan.highlight && (
-                  <div className="mb-4 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="absolute top-0 right-8 -translate-y-1/2 bg-indigo-600 text-white px-3 py-1 text-xs font-bold rounded-full uppercase">
                     Most Popular
-                  </div>
+                  </span>
                 )}
+                
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold leading-8 text-gray-900 dark:text-white">{plan.name}</h3>
+                  <p className="mt-4 flex items-baseline gap-x-1">
+                    <span className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">{plan.price}</span>
+                    <span className="text-sm font-semibold leading-6 text-gray-600 dark:text-gray-400">/month</span>
+                  </p>
+                  <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{plan.desc}</p>
+                </div>
 
-                <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{plan.name}</h3>
-                <p className="mt-4 text-5xl font-bold text-gray-900 dark:text-gray-100">{plan.price}</p>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">{plan.desc}</p>
+                <ul className="flex-1 space-y-4 text-sm leading-6 text-gray-600 dark:text-gray-400 mb-8">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex gap-x-3">
+                      <svg className="h-6 w-5 flex-none text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.704 4.176a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                      </svg>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
 
                 <button
-                  type="button"
                   onClick={() => handleChoosePlan(plan.id)}
-                  disabled={isActivePlan || loadingPlan !== null}
-                  className={`mt-8 w-full rounded-xl px-5 py-3 font-semibold transition ${
-                    isActivePlan
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+                  disabled={activePlanId === plan.id || loadingPlanId !== null}
+                  className={`mt-4 block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold leading-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-all ${
+                    activePlanId === plan.id
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800'
+                      : plan.highlight
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600'
+                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30'
                   }`}
-                  style={
-                    isActivePlan || loadingPlan !== null
-                      ? {
-                          opacity: 0.6,
-                          cursor: "not-allowed",
-                          filter: "grayscale(0.2)",
-                        }
-                      : undefined
-                  }
                 >
-                  {isUpdatingThisPlan
-                    ? "Updating..."
-                    : isActivePlan
-                      ? "Current Plan"
-                      : "Choose Plan"}
+                  {loadingPlanId === plan.id
+                    ? 'Processing...'
+                    : activePlanId === plan.id
+                      ? 'Current Plan'
+                      : 'Get started today'}
                 </button>
               </div>
-            )})}
+            ))}
           </div>
         </div>
-      </section>
+      </main>
 
       <Footer />
     </div>
   );
 }
-

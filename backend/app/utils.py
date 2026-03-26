@@ -1,12 +1,12 @@
 from flask import jsonify
 
-def api_response(success=True, data=None, error=None, status_code=200):
+def api_response(success=True, message=None, data=None, status_code=200):
     """
-    Standard API response format.
+    Standardized API response format.
     """
     response = {
         "success": success,
-        "data": data,
-        "error": error
+        "message": message,
+        "data": data or {}
     }
     return jsonify(response), status_code

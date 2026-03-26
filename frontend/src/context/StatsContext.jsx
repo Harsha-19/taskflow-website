@@ -1,21 +1,32 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-
-import { getStats } from "frontend/src/services/api.js";
+import api from "@/services/api";
 
 const StatsContext = createContext(null);
 
 export function StatsProvider({ children }) {
   const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   async function refreshStats() {
-    const nextStats = await getStats();
-    setStats(nextStats);
-    return nextStats;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.dashboard.getStats();
+      const nextStats = response.data;
+      setStats(nextStats);
+      return nextStats;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }
 
   const value = useMemo(
-    () => ({ stats, setStats, refreshStats }),
-    [stats]
+    () => ({ stats, setStats, refreshStats, loading, error }),
+    [stats, loading, error]
   );
 
   return <StatsContext.Provider value={value}>{children}</StatsContext.Provider>;
