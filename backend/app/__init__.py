@@ -84,13 +84,15 @@ def create_app() -> Flask:
     @app.after_request
     def handle_cors(response):
         origin = request.headers.get('Origin')
-        if origin and (origin in Config.CORS_ORIGINS or '*' in Config.CORS_ORIGINS):
+        # Explicit check for your Vercel and local dev origins
+        allowed_origins = Config.CORS_ORIGINS + ["https://taskflowebsite.vercel.app"]
+        
+        if origin and (origin in allowed_origins or '*' in Config.CORS_ORIGINS):
             response.headers.set('Access-Control-Allow-Origin', origin)
             response.headers.set('Access-Control-Allow-Credentials', 'true')
             response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
             response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
         
-        # Ensure OPTIONS always returns 200
         if request.method == 'OPTIONS':
             response.status_code = 200
         return response
