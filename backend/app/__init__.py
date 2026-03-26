@@ -82,7 +82,7 @@ def create_app() -> Flask:
         seed_plans()
 
     @app.after_request
-    def add_cors_headers(response):
+    def handle_cors(response):
         origin = request.headers.get('Origin')
         if origin and (origin in Config.CORS_ORIGINS or '*' in Config.CORS_ORIGINS):
             response.headers.set('Access-Control-Allow-Origin', origin)
@@ -90,6 +90,7 @@ def create_app() -> Flask:
             response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
             response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
         
+        # Ensure OPTIONS always returns 200
         if request.method == 'OPTIONS':
             response.status_code = 200
         return response
